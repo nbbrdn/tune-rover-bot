@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "tune-rover-bot"
+version = "0.1.0"
+description = "Music Albums Advisor Telegram Bot"
+authors = ["Nikolay Bayborodin <nbbrdn@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+python-telegram-bot = "^20.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
