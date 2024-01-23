@@ -14,7 +14,10 @@ from telegram.ext import (
 from datetime import datetime
 
 DB_FILE = "database.db"
+
 ALBUM_TITLE, ALBUM_ARTIST, ALBUM_LABEL, ALBUM_YEAR, ALBUM_COVER = range(5)
+
+USER_ROLE = {"USER": 0, "ADMIN": 1}
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -36,6 +39,7 @@ def create_table():
         CREATE TABLE IF NOT EXISTS users(
             user_id INTEGER PRIMARY KEY, 
             username TEXT, 
+            is_admin INTEGER,
             created_at TIMESTAMP, 
             updated_at TIMESTAMP
         );
@@ -96,7 +100,7 @@ def get_random_album():
     return random_album
 
 
-def add_user(user_id, username):
+def add_user(user_id, username, is_admin=False):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
@@ -106,18 +110,32 @@ def add_user(user_id, username):
     existing_user = cursor.fetchone()
 
     if not existing_user:
+        is_admin = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
         cursor.execute(
-            "INSERT INTO users (user_id, username, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            (user_id, username, current_time, current_time),
+            "INSERT INTO users (user_id, username, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, username, is_admin, current_time, current_time),
         )
         conn.commit()
     else:
         cursor.execute(
-            "UPDATE users SET username = ?, updated_at = ? WHERE user_id = ?",
-            (username, current_time, user_id),
+            "UPDATE users SET username = ?, is_admin = ?, updated_at = ? WHERE user_id = ?",
+            (username, is_admin, current_time, user_id),
         )
         conn.commit()
     conn.close()
+
+
+def get_user_role(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    # Получаем роль пользователя
+    cursor.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
+    role = cursor.fetchone()
+
+    conn.close()
+
+    return role[0] if role else 0
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,10 +161,16 @@ async def random_album(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def add_album_start(update: Update, context: CallbackContext) -> int:
-    await update.message.reply_text(
-        "Давайте добавим новый альбом. Введите название альбома:"
-    )
-    return ALBUM_TITLE
+    user_id = update.message.from_user.id
+    user_role = get_user_role(user_id)
+    if user_role == USER_ROLE["ADMIN"]:
+        await update.message.reply_text(
+            "Давайте добавим новый альбом. Введите название альбома:"
+        )
+        return ALBUM_TITLE
+    else:
+        await update.message.reply_text("У вас нет прав для выполнения этой команды.")
+        return ConversationHandler.END
 
 
 async def add_album_title(update: Update, context: CallbackContext) -> int:
@@ -251,7 +275,7 @@ def main():
     application.add_handler(random_album_handler)
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("add_album", add_album_start)],
+        entry_points=[CommandHandler("add", add_album_start)],
         states={
             ALBUM_TITLE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, add_album_title)
