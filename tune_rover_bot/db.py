@@ -11,7 +11,7 @@ def create_table():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users(
-            user_id INTEGER PRIMARY KEY, 
+            user_id UNSIGNED BIG INT PRIMARY KEY, 
             username TEXT, 
             is_admin INTEGER,
             created_at TIMESTAMP, 
@@ -33,7 +33,7 @@ def create_table():
             ymusic_uri TEXT,
             youtube_uri TEXT,
             spotify_uri TEXT,
-            created_at TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
     )
