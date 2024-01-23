@@ -1,7 +1,7 @@
 import os
 import logging
 import sqlite3
-from telegram import Update
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -140,9 +140,12 @@ def get_user_role(user_id):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    button = [[KeyboardButton("Удиви меня")]]
     add_user(user.id, user.username)
     await context.bot.send_message(
-        chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!"
+        chat_id=update.effective_chat.id,
+        text="I'm a bot, please talk to me!",
+        reply_markup=ReplyKeyboardMarkup(button, resize_keyboard=True),
     )
 
 
@@ -263,6 +266,22 @@ async def add_album_cancel(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def surprise_me(update: Update, context: CallbackContext) -> None:
+    album = get_random_album()
+
+    await update.message.delete()
+
+    if album:
+        id, title, artist, label, release_year, cover_path, created_at = album
+        cover_path = os.path.join(os.getcwd(), "covers", cover_path)
+        await update.message.reply_photo(
+            open(cover_path, "rb"),
+            caption=f"Случайный альбом: {title} - {artist}, год выпуска: {release_year}, добавлен: {created_at}",
+        )
+    else:
+        await update.message.reply_text("Database doesn't has any album.")
+
+
 def main():
     create_table()
 
@@ -296,6 +315,8 @@ def main():
         fallbacks=[CommandHandler("cancel", add_album_cancel)],
     )
     application.add_handler(conv_handler)
+
+    application.add_handler(MessageHandler(filters.Text(["Удиви меня"]), surprise_me))
 
     application.run_polling()
 
