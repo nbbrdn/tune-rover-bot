@@ -31,8 +31,6 @@ def create_table():
             cover_path TEXT,
             itunes_uri TEXT,
             ymusic_uri TEXT,
-            youtube_uri TEXT,
-            spotify_uri TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
@@ -94,7 +92,7 @@ def get_random_album():
     return random_album
 
 
-def add_album(title, artist, label, release_year, cover_path):
+def add_album(title, artist, label, release_year, cover_path, itunes, ymusic):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
@@ -108,8 +106,10 @@ def add_album(title, artist, label, release_year, cover_path):
             label,
             release_year,
             cover_path,
+            itunes_uri,
+            ymusic_uri,
             created_at
-        ) VALUES(?, ?, ?, ?, ?, ?);
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?);
         """,
         (
             title,
@@ -117,9 +117,22 @@ def add_album(title, artist, label, release_year, cover_path):
             label,
             release_year,
             cover_path,
+            itunes,
+            ymusic,
             current_time,
         ),
     )
 
     conn.commit()
     conn.close()
+
+
+def find_album(title, artist):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM albums WHERE title = ? AND artist = ?", (title, artist)
+    )
+    album = cursor.fetchone()
+
+    return album

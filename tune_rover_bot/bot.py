@@ -19,7 +19,15 @@ from telegram.ext import (
 import db
 
 
-ALBUM_TITLE, ALBUM_ARTIST, ALBUM_LABEL, ALBUM_YEAR, ALBUM_COVER = range(5)
+(
+    ALBUM_TITLE,
+    ALBUM_ARTIST,
+    ALBUM_LABEL,
+    ALBUM_YEAR,
+    ALBUM_COVER,
+    ALBUM_ITUNES,
+    ALBUM_YMUSIC,
+) = range(7)
 
 USER_ROLE = {"USER": 0, "ADMIN": 1}
 
@@ -40,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.add_user(user.id, user.username)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="I'm a bot, please talk to me!",
+        text="Привет! Я - твой проводник в мире музыки! Пристегнись - нас ждут удивительные открытия в мире музыки!",
         reply_markup=ReplyKeyboardMarkup(button, resize_keyboard=True),
     )
 
@@ -111,9 +119,18 @@ async def add_album_year(update: Update, context: CallbackContext) -> int:
         update.message.reply_text("Введите корректный год в числовом формате.")
         return ALBUM_YEAR
 
-    await update.message.reply_text(
-        f'Отлично! Теперь отправьте обложку альбома {user_data["title"]} от {user_data["artist"]} (ответьте на это сообщение изображением).'
-    )
+    album = db.find_album(user_data["title"], user_data["artist"])
+    if album:
+        user_data.clear()
+        await update.message.reply_text(
+            "Похоже, этот альбом уже есть в базе!\nДобавление альбома отменено."
+        )
+        return ConversationHandler.END
+    else:
+        await update.message.reply_text(
+            f'Отлично! Теперь отправьте обложку альбома {user_data["title"]} от {user_data["artist"]} (ответьте на это сообщение изображением).'
+        )
+
     return ALBUM_COVER
 
 
@@ -131,27 +148,46 @@ async def add_album_cover(update: Update, context: CallbackContext) -> int:
 
         # Скачиваем файл и сохраняем его
         await photo_file.download_to_drive(cover_path_full)
-        logger.info("Photo of %s: %s", user_data["title"], cover_path_full)
-
-        # Добавляем альбом в базу данных
-        db.add_album(
-            user_data["title"],
-            user_data["artist"],
-            user_data["label"],
-            user_data["year"],
-            cover_path,
+        user_data["cover_path"] = cover_path
+        await update.message.reply_text(
+            'Обложка альбома успешно добавлена! Теперь укажите ссылку на альбом в iTunes (если есть), или введите "нет":'
         )
-
-        # Очищаем данные пользователя
-        user_data.clear()
-
-        await update.message.reply_text("Альбом успешно добавлен в базу данных!")
-        return ConversationHandler.END
+        return ALBUM_ITUNES
     else:
         await update.message.reply_text(
-            "Ответьте на это сообщение изображением (обложкой альбома)."
+            "Пожалуйста, отправьте фотографию в формате JPEG или PNG."
         )
         return ALBUM_COVER
+
+
+async def add_album_itunes(update: Update, context: CallbackContext) -> int:
+    user_data = context.user_data
+    user_data["itunes_link"] = (
+        update.message.text if update.message.text.lower() != "нет" else None
+    )
+    await update.message.reply_text(
+        'Отлично! Теперь укажите ссылку на альбом в Яндекс.Музыке (если есть), или введите "нет":'
+    )
+    return ALBUM_YMUSIC
+
+
+async def add_album_ymusic(update: Update, context: CallbackContext) -> int:
+    user_data = context.user_data
+    user_data["ymusic_link"] = (
+        update.message.text if update.message.text.lower() != "нет" else None
+    )
+    db.add_album(
+        user_data["title"],
+        user_data["artist"],
+        user_data["label"],
+        user_data["year"],
+        user_data["cover_path"],
+        user_data["itunes_link"],
+        user_data["ymusic_link"],
+    )
+    await update.message.reply_text("Альбом успешно добавлен в базу данных!")
+    context.user_data.clear()
+    return ConversationHandler.END
 
 
 async def add_album_cancel(update: Update, context: CallbackContext) -> int:
@@ -231,6 +267,12 @@ def main():
             ],
             ALBUM_COVER: [
                 MessageHandler(filters.PHOTO & ~filters.COMMAND, add_album_cover)
+            ],
+            ALBUM_ITUNES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_album_itunes)
+            ],
+            ALBUM_YMUSIC: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_album_ymusic)
             ],
         },
         fallbacks=[CommandHandler("cancel", add_album_cancel)],
