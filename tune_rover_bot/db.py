@@ -85,7 +85,7 @@ def get_random_album():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT title, artist, label, release_year, cover_path FROM albums ORDER BY RANDOM() LIMIT 1"
+        "SELECT title, artist, label, release_year, cover_path, itunes_uri, ymusic_uri FROM albums ORDER BY RANDOM() LIMIT 1"
     )
     random_album = cursor.fetchone()
 

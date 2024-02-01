@@ -1,6 +1,12 @@
 import os
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
+from telegram import (
+    Update,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -162,11 +168,36 @@ async def surprise_me(update: Update, context: CallbackContext) -> None:
     await update.message.delete()
 
     if album:
-        title, artist, label, release_year, cover_path = album
+        title, artist, label, release_year, cover_path, itunes, ymusic = album
         cover_path = os.path.join(os.getcwd(), "covers", cover_path)
+
+        keyboard = [[]]
+
+        if itunes:
+            keyboard[0].append(
+                InlineKeyboardButton(
+                    "Apple Music",
+                    url=itunes,
+                )
+            )
+
+        if ymusic:
+            keyboard[0].append(
+                InlineKeyboardButton(
+                    "Яндекс Музыка",
+                    url=ymusic,
+                )
+            )
+
+        if keyboard:
+            reply_markup = InlineKeyboardMarkup(keyboard)
+        else:
+            reply_markup = None
+
         await update.message.reply_photo(
             open(cover_path, "rb"),
             caption=f"{title} - {artist} ({label}, {release_year})",
+            reply_markup=reply_markup,
         )
     else:
         await update.message.reply_text("Database doesn't has any album.")
