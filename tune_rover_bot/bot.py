@@ -162,11 +162,11 @@ async def surprise_me(update: Update, context: CallbackContext) -> None:
     await update.message.delete()
 
     if album:
-        id, title, artist, label, release_year, cover_path, created_at = album
+        title, artist, label, release_year, cover_path = album
         cover_path = os.path.join(os.getcwd(), "covers", cover_path)
         await update.message.reply_photo(
             open(cover_path, "rb"),
-            caption=f"Случайный альбом: {title} - {artist}, год выпуска: {release_year}, добавлен: {created_at}",
+            caption=f"{title} - {artist} ({label}, {release_year})",
         )
     else:
         await update.message.reply_text("Database doesn't has any album.")
