@@ -1,6 +1,5 @@
 import os
 import logging
-import sqlite3
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,9 +10,8 @@ from telegram.ext import (
     filters,
     CallbackContext,
 )
-from datetime import datetime
+import db
 
-DB_FILE = "database.db"
 
 ALBUM_TITLE, ALBUM_ARTIST, ALBUM_LABEL, ALBUM_YEAR, ALBUM_COVER = range(5)
 
@@ -30,118 +28,10 @@ if not TELEGRAM_BOT_TOKEN:
     exit("Specify TELEGRAM_BOT_TOKEN env variable")
 
 
-def create_table():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users(
-            user_id INTEGER PRIMARY KEY, 
-            username TEXT, 
-            is_admin INTEGER,
-            created_at TIMESTAMP, 
-            updated_at TIMESTAMP
-        );
-        """
-    )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS albums(
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            artist TEXT, 
-            title TEXT, 
-            label TEXT, 
-            release_year INTEGER,
-            cover_path TEXT,
-            created_at TIMESTAMP
-        );
-        """
-    )
-
-    conn.commit()
-    conn.close()
-
-
-def add_album(title, artist, label, release_year, cover_path):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute(
-        """
-        INSERT INTO albums (
-            title,
-            artist,
-            label,
-            release_year,
-            cover_path,
-            created_at
-        ) VALUES(?, ?, ?, ?, ?, ?);
-        """,
-        (title, artist, label, release_year, cover_path, current_time),
-    )
-
-    conn.commit()
-    conn.close()
-
-
-def get_random_album():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM albums ORDER BY RANDOM() LIMIT 1")
-    random_album = cursor.fetchone()
-
-    conn.close()
-
-    return random_album
-
-
-def add_user(user_id, username, is_admin=False):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    existing_user = cursor.fetchone()
-
-    if not existing_user:
-        is_admin = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
-        cursor.execute(
-            "INSERT INTO users (user_id, username, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (user_id, username, is_admin, current_time, current_time),
-        )
-        conn.commit()
-    else:
-        cursor.execute(
-            "UPDATE users SET username = ?, is_admin = ?, updated_at = ? WHERE user_id = ?",
-            (username, is_admin, current_time, user_id),
-        )
-        conn.commit()
-    conn.close()
-
-
-def get_user_role(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    # Получаем роль пользователя
-    cursor.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
-    role = cursor.fetchone()
-
-    conn.close()
-
-    return role[0] if role else 0
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     button = [[KeyboardButton("Удиви меня")]]
-    add_user(user.id, user.username)
+    db.add_user(user.id, user.username)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="I'm a bot, please talk to me!",
@@ -150,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def random_album(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    album = get_random_album()
+    album = db.get_random_album()
 
     if album:
         id, title, artist, label, release_year, cover_path, created_at = album
@@ -165,7 +55,7 @@ async def random_album(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def add_album_start(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
-    user_role = get_user_role(user_id)
+    user_role = db.get_user_role(user_id)
     if user_role == USER_ROLE["ADMIN"]:
         await update.message.reply_text(
             "Давайте добавим новый альбом. Введите название альбома:"
@@ -238,7 +128,7 @@ async def add_album_cover(update: Update, context: CallbackContext) -> int:
         logger.info("Photo of %s: %s", user_data["title"], cover_path_full)
 
         # Добавляем альбом в базу данных
-        add_album(
+        db.add_album(
             user_data["title"],
             user_data["artist"],
             user_data["label"],
@@ -267,7 +157,7 @@ async def add_album_cancel(update: Update, context: CallbackContext) -> int:
 
 
 async def surprise_me(update: Update, context: CallbackContext) -> None:
-    album = get_random_album()
+    album = db.get_random_album()
 
     await update.message.delete()
 
@@ -283,7 +173,7 @@ async def surprise_me(update: Update, context: CallbackContext) -> None:
 
 
 def main():
-    create_table()
+    db.create_table()
 
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
