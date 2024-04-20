@@ -11,10 +11,10 @@ def create_table():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users(
-            user_id UNSIGNED BIG INT PRIMARY KEY, 
-            username TEXT, 
+            user_id UNSIGNED BIG INT PRIMARY KEY,
+            username TEXT,
             is_admin INTEGER,
-            created_at TIMESTAMP, 
+            created_at TIMESTAMP,
             updated_at TIMESTAMP
         );
         """
@@ -23,10 +23,10 @@ def create_table():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS albums(
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            artist TEXT, 
-            title TEXT, 
-            label TEXT, 
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artist TEXT,
+            title TEXT,
+            label TEXT,
             release_year INTEGER,
             cover_path TEXT,
             itunes_uri TEXT,
@@ -65,13 +65,21 @@ def add_user(user_id, username, is_admin=False):
     if not existing_user:
         is_admin = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
         cursor.execute(
-            "INSERT INTO users (user_id, username, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT INTO
+            users (user_id, username, is_admin, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
             (user_id, username, is_admin, current_time, current_time),
         )
         conn.commit()
     else:
         cursor.execute(
-            "UPDATE users SET username = ?, is_admin = ?, updated_at = ? WHERE user_id = ?",
+            """
+            UPDATE users
+            SET username = ?, is_admin = ?, updated_at = ?
+            WHERE user_id = ?
+            """,
             (username, is_admin, current_time, user_id),
         )
         conn.commit()
@@ -83,13 +91,17 @@ def get_random_album():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT title, artist, label, release_year, cover_path, itunes_uri, ymusic_uri FROM albums ORDER BY RANDOM() LIMIT 1"
+        """
+        SELECT title, artist, label, release_year, cover_path, itunes_uri, ymusic_uri
+        FROM albums
+        ORDER BY RANDOM()
+        LIMIT 1
+        """
     )
-    random_album = cursor.fetchone()
 
     conn.close()
 
-    return random_album
+    return cursor.fetchone()
 
 
 def add_album(title, artist, label, release_year, cover_path, itunes, ymusic):
@@ -133,6 +145,5 @@ def find_album(title, artist):
     cursor.execute(
         "SELECT * FROM albums WHERE title = ? AND artist = ?", (title, artist)
     )
-    album = cursor.fetchone()
 
-    return album
+    return cursor.fetchone()

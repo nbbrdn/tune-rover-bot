@@ -1,23 +1,23 @@
-import os
 import logging
+import os
+
+import db
 from telegram import (
-    Update,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    Update,
 )
 from telegram.ext import (
     ApplicationBuilder,
-    ContextTypes,
+    CallbackContext,
     CommandHandler,
+    ContextTypes,
     ConversationHandler,
     MessageHandler,
     filters,
-    CallbackContext,
 )
-import db
-
 
 (
     ALBUM_TITLE,
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
-    exit("Specify TELEGRAM_BOT_TOKEN env variable")
+    exit("Specify TELEGRAM_BOT_TOKEN env variable.")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,7 +48,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.add_user(user.id, user.username)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Привет! Я - твой проводник в мире музыки! Пристегнись - нас ждут удивительные открытия в мире музыки!",
+        text=(
+            "Привет! Я - твой проводник в мире музыки! ",
+            "Пристегнись - нас ждут удивительные открытия в мире музыки!",
+        ),
         reply_markup=ReplyKeyboardMarkup(button, resize_keyboard=True),
     )
 
@@ -59,10 +62,14 @@ async def random_album(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if album:
         id, title, artist, label, release_year, cover_path, created_at = album
         cover_path = os.path.join(os.getcwd(), "covers", cover_path)
-        await update.message.reply_photo(
-            open(cover_path, "rb"),
-            caption=f"Случайный альбом: {title} - {artist}, год выпуска: {release_year}, добавлен: {created_at}",
+
+        caption = (
+            f"Случайный альбом: {title} - {artist}, "
+            f"год выпуска: {release_year}, "
+            f"добавлен: {created_at}"
         )
+
+        await update.message.reply_photo(open(cover_path, "rb"), caption=caption)
     else:
         await update.message.reply_text("Database doesn't has any album.")
 
@@ -75,9 +82,9 @@ async def add_album_start(update: Update, context: CallbackContext) -> int:
             "Давайте добавим новый альбом. Введите название альбома:"
         )
         return ALBUM_TITLE
-    else:
-        await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        return ConversationHandler.END
+
+    await update.message.reply_text("У вас нет прав для выполнения этой команды.")
+    return ConversationHandler.END
 
 
 async def add_album_title(update: Update, context: CallbackContext) -> int:
@@ -94,9 +101,14 @@ async def add_album_artist(update: Update, context: CallbackContext) -> int:
     user_data = context.user_data
     user_data["artist"] = update.message.text
 
-    await update.message.reply_text(
-        f'Хорошо! Теперь введите название лейбла, выпустившего альбом {user_data["title"]} от {user_data["artist"]}:'
+    title = user_data["title"]
+    artist = user_data["artist"]
+    message = (
+        "Хорошо! Теперь введите название лейбла, "
+        f"выпустившего альбом {title} от {artist}:"
     )
+
+    await update.message.reply_text(message)
     return ALBUM_LABEL
 
 
@@ -104,9 +116,10 @@ async def add_album_label(update: Update, context: CallbackContext) -> int:
     user_data = context.user_data
     user_data["label"] = update.message.text
 
-    await update.message.reply_text(
-        f'Хорошо! Теперь введите год выпуска альбома {user_data["title"]} от {user_data["artist"]}:'
-    )
+    title = user_data["title"]
+    artist = user_data["artist"]
+    message = f"Хорошо! Теперь введите год выпуска альбома {title} от {artist}:"
+    await update.message.reply_text(message)
     return ALBUM_YEAR
 
 
@@ -126,10 +139,14 @@ async def add_album_year(update: Update, context: CallbackContext) -> int:
             "Похоже, этот альбом уже есть в базе!\nДобавление альбома отменено."
         )
         return ConversationHandler.END
-    else:
-        await update.message.reply_text(
-            f'Отлично! Теперь отправьте обложку альбома {user_data["title"]} от {user_data["artist"]} (ответьте на это сообщение изображением).'
-        )
+
+    title = user_data["title"]
+    artist = user_data["artist"]
+    message = f"Отлично! Теперь отправьте обложку альбома {title} от {artist}"
+    prompt = " (ответьте на это сообщение изображением)."
+    full_message = message + prompt
+
+    await update.message.reply_text(full_message)
 
     return ALBUM_COVER
 
@@ -143,21 +160,26 @@ async def add_album_cover(update: Update, context: CallbackContext) -> int:
         photo_file = await update.message.photo[-1].get_file()
 
         # Получаем путь для сохранения файла
-        cover_path = f'cover_{user_data["title"].replace(" ", "_")}_{user_data["artist"].replace(" ", "_")}_{user_data["year"]}.jpg'
+        title = user_data["title"].replace(" ", "_")
+        artist = user_data["artist"].replace(" ", "_")
+        year = user_data["year"]
+        cover_path = f"cover_{title}_{artist}_{year}.jpg"
+
         cover_path_full = os.path.join(os.getcwd(), "covers", cover_path)
 
         # Скачиваем файл и сохраняем его
         await photo_file.download_to_drive(cover_path_full)
         user_data["cover_path"] = cover_path
         await update.message.reply_text(
-            'Обложка альбома успешно добавлена! Теперь укажите ссылку на альбом в iTunes (если есть), или введите "нет":'
+            "Обложка альбома успешно добавлена!"
+            'Теперь укажите ссылку на альбом в iTunes (если есть), или введите "нет":'
         )
         return ALBUM_ITUNES
-    else:
-        await update.message.reply_text(
-            "Пожалуйста, отправьте фотографию в формате JPEG или PNG."
-        )
-        return ALBUM_COVER
+
+    await update.message.reply_text(
+        "Пожалуйста, отправьте фотографию в формате JPEG или PNG."
+    )
+    return ALBUM_COVER
 
 
 async def add_album_itunes(update: Update, context: CallbackContext) -> int:
@@ -166,7 +188,8 @@ async def add_album_itunes(update: Update, context: CallbackContext) -> int:
         update.message.text if update.message.text.lower() != "нет" else None
     )
     await update.message.reply_text(
-        'Отлично! Теперь укажите ссылку на альбом в Яндекс.Музыке (если есть), или введите "нет":'
+        "Отлично! Теперь укажите ссылку на альбом в "
+        'Яндекс.Музыке (если есть), или введите "нет":'
     )
     return ALBUM_YMUSIC
 
