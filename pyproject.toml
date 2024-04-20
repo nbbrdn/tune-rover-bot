@@ -10,6 +10,16 @@ python = "^3.12"
 python-telegram-bot = "^20.7"
 
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+flake8 = "^7.0.0"
+flake8-bandit = "^4.1.1"
+flake8-broken-line = "^1.0.0"
+flake8-isort = "^6.1.1"
+flake8-return = "^1.2.0"
+pep8-naming = "^0.13.3"
+pre-commit = "^3.7.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
